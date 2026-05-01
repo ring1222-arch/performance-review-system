@@ -1,0 +1,80 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "sqlite"; url = env("DATABASE_URL") }
+
+enum Role { employee manager admin }
+enum ReviewStatus { self_draft self_submitted manager_reviewing completed }
+enum ReviewerType { self manager }
+
+model User {
+  employeeId String @id
+  username String @unique
+  password String
+  name String
+  department String
+  hireDate DateTime?
+  role Role @default(employee)
+  isActive Boolean @default(true)
+  managerId String?
+  manager User? @relation("ManagerMembers", fields: [managerId], references: [employeeId])
+  members User[] @relation("ManagerMembers")
+  reviews Review[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ReviewTemplate {
+  id String @id
+  year Int
+  department String
+  version Int @default(1)
+  name String
+  status String @default("published")
+  items ReviewTemplateItem[]
+  reviews Review[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([year, department, version])
+}
+
+model ReviewTemplateItem {
+  id String @id
+  templateId String
+  key String
+  label String
+  weight Int
+  required Boolean @default(true)
+  sortOrder Int
+  template ReviewTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  scores ReviewItemScore[]
+  @@unique([templateId, key])
+}
+
+model Review {
+  id String @id
+  year Int
+  employeeId String
+  templateId String
+  status ReviewStatus @default(self_draft)
+  selfSummary String?
+  managerSummary String?
+  selfSubmittedAt DateTime?
+  managerSubmittedAt DateTime?
+  employee User @relation(fields: [employeeId], references: [employeeId])
+  template ReviewTemplate @relation(fields: [templateId], references: [id])
+  scores ReviewItemScore[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([year, employeeId])
+}
+
+model ReviewItemScore {
+  id String @id
+  reviewId String
+  templateItemId String
+  reviewerType ReviewerType
+  score Int?
+  comment String?
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  templateItem ReviewTemplateItem @relation(fields: [templateItemId], references: [id])
+  @@unique([reviewId, templateItemId, reviewerType])
+}
